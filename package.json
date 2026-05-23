@@ -1,0 +1,40 @@
+{
+  "name": "data-analyzer",
+  "version": "1.0.0",
+  "description": "一键智能数据分析工具",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder"
+  },
+  "build": {
+    "appId": "com.dataanalyzer.app",
+    "productName": "智能数据分析工具",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": false,
+    "extraResources": [
+      {
+        "from": "node_modules/",
+        "to": "node_modules/"
+      }
+    ],
+    "win": {
+      "target": "dir",
+      "icon": "icon.ico",
+      "sign": null
+    }
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "echarts": "^5.4.3",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
+    "xlsx": "^0.18.5"
+  }
+}

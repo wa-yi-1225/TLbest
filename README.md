@@ -1,2 +1,74 @@
-# TLbest
-This repository stores various software and practical utility tools created by AI-assisted development. These programs aim to assist daily work, simplify operational processes and boost productivity.
+# 智能数据分析工具
+
+一款全自动、智能化的桌面数据分析应用，支持多种数据格式导入，自动完成数据清洗、统计分析和可视化报告生成。
+
+## ✨ 功能特点
+
+- **📁 智能数据导入**：支持Excel (.xlsx/.xls)、CSV、TXT等多种格式
+- **🧹 全自动数据清洗**：自动处理缺失值、重复值、异常值（3σ原则）
+- **📊 智能统计分析**：自动计算均值、中位数、标准差、相关性等
+- **📈 数据可视化**：趋势图、柱状图、直方图、热力图
+- **📝 双语报告导出**：支持中文和英文报告导出
+- **🔍 智能洞察**：基于数据特征自动生成业务建议
+- **🌐 离线运行**：所有处理在本地完成，保护数据隐私
+
+## 🚀 快速开始
+
+### 方式一：直接下载（推荐）
+
+下载最新版本：[GitHub Releases](https://github.com/您的用户名/data-analysis-tool/releases)
+
+### 方式二：从源码构建
+
+```bash
+# 克隆仓库
+git clone https://github.com/您的用户名/data-analysis-tool.git
+cd data-analysis-tool
+
+# 安装依赖（需要Node.js 16+）
+npm install
+
+# 开发模式运行
+npm run dev
+
+# 打包为EXE
+npm run dist
+```
+
+## 📖 使用说明
+
+1. **导入数据**：点击左侧"导入数据"按钮，选择您的Excel或CSV文件
+2. **数据预览**：在中间面板查看数据预览（前100行）
+3. **一键分析**：点击"一键分析"自动完成所有分析
+4. **查看结果**：在右侧面板查看统计结果和图表
+5. **导出报告**：点击"导出报告"生成中英文双语报告
+
+## 📁 支持的文件格式
+
+| 格式 | 扩展名 | 说明 |
+|------|--------|------|
+| Excel | .xlsx | 推荐格式 |
+| Excel | .xls | 旧版Excel |
+| CSV | .csv | 逗号分隔文件 |
+| TXT | .txt | 文本文件 |
+| TSV | .tsv | Tab分隔文件 |
+
+## 🛠️ 技术栈
+
+- **框架**：Electron 28
+- **语言**：JavaScript (ES6+)
+- **图表**：ECharts
+- **Excel解析**：xlsx
+- **PDF生成**：jsPDF
+
+## 📄 许可证
+
+MIT License - 详见 LICENSE 文件
+
+## 📧 联系方式
+
+如有问题或建议，请提交 Issue 或发送邮件。
+
+---
+
+*Made with ❤️ for data analysts*

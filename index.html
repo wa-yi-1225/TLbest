@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一键智能数据分析工具</title>
+    <script>
+        const xlsx = require('xlsx');
+        const XLSX = xlsx;
+        const echarts = require('echarts');
+        const jspdf = require('jspdf');
+        require('jspdf-autotable');
+        window.XLSX = XLSX;
+        window.echarts = echarts;
+        window.jspdf = jspdf;
+        console.log('XLSX loaded:', typeof XLSX.read);
+        console.log('jsPDF loaded:', typeof jspdf.jsPDF);
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            height: 100vh;
+            overflow: auto;
+        }
+        .container { display: flex; flex-direction: column; height: 100vh; min-height: 100vh; }
+        .main-content { display: flex; flex: 1; overflow: auto; min-height: 0; }
+        
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
+            background: rgba(30, 41, 59, 0.95);
+            border-right: 1px solid #334155;
+            padding: 20px 15px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .sidebar-title {
+            font-size: 20px; font-weight: bold; color: #60a5fa;
+            text-align: center; margin-bottom: 25px;
+            padding-bottom: 15px; border-bottom: 2px solid #334155;
+        }
+        .btn {
+            width: 100%; padding: 14px 16px; margin-bottom: 12px;
+            border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s ease;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .btn-warning:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); }
+        .btn-info { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; }
+        .btn-info:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
+        .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+        .btn-oneclick {
+            background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); color: white;
+            margin-top: 10px; padding: 18px; font-size: 17px;
+        }
+        .btn-oneclick:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(236, 72, 153, 0.5); }
+        .divider { height: 1px; background: #334155; margin: 15px 0; }
+
+        .data-panel {
+            flex: 1; display: flex; flex-direction: column;
+            background: rgba(15, 23, 42, 0.6); border-right: 1px solid #334155;
+            min-width: 400px;
+            overflow: hidden;
+        }
+        .panel-header {
+            padding: 15px 20px; background: rgba(30, 41, 59, 0.8);
+            border-bottom: 1px solid #334155;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .panel-title { font-size: 16px; font-weight: 600; color: #94a3b8; }
+        .download-chart-btn { padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        .download-chart-btn:hover { background: #2563eb; }
+        .data-info { font-size: 13px; color: #64748b; }
+        .table-container { flex: 1; overflow: auto; padding: 15px; min-height: 0; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .data-table th {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 12px 10px; text-align: left; font-weight: 600; color: #60a5fa;
+            border: 1px solid #334155; position: sticky; top: 0; z-index: 10;
+        }
+        .data-table td { padding: 10px; border: 1px solid #334155; color: #cbd5e1; white-space: nowrap; }
+        .data-table tr:hover { background: rgba(59, 130, 246, 0.1); }
+
+        .analysis-panel {
+            flex: 1;
+            min-width: 420px;
+            max-width: 50vw;
+            display: flex;
+            flex-direction: column;
+            background: rgba(15, 23, 42, 0.8);
+            overflow: hidden;
+        }
+        .chart-tabs {
+            display: flex; padding: 10px 15px; gap: 8px;
+            background: rgba(30, 41, 59, 0.5); border-bottom: 1px solid #334155;
+            overflow-x: auto;
+            flex-shrink: 0;
+        }
+        .chart-tab {
+            padding: 8px 14px; background: transparent; border: 1px solid #334155;
+            border-radius: 6px; color: #94a3b8; font-size: 13px; cursor: pointer;
+            white-space: nowrap; transition: all 0.2s;
+        }
+        .chart-tab:hover { border-color: #60a5fa; color: #60a5fa; }
+        .chart-tab.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+        .chart-container { flex: 1; min-height: 280px; padding: 15px; }
+        #chart { width: 100%; height: 100%; }
+        .result-container {
+            height: 260px; border-top: 1px solid #334155;
+            padding: 15px; display: flex; flex-direction: column;
+        }
+        .result-title { font-size: 14px; font-weight: 600; color: #94a3b8; margin-bottom: 10px; }
+        .result-content {
+            flex: 1; overflow: auto; background: rgba(15, 23, 42, 0.9);
+            border-radius: 8px; padding: 12px; font-size: 13px;
+            line-height: 1.8; color: #cbd5e1;
+            font-family: 'Consolas', 'Microsoft YaHei', monospace;
+        }
+
+        .log-panel {
+            height: 150px; background: rgba(15, 23, 42, 0.95);
+            border-top: 1px solid #334155; display: flex; flex-direction: column;
+        }
+        .log-header {
+            padding: 8px 15px; background: rgba(30, 41, 59, 0.8);
+            border-bottom: 1px solid #334155;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .log-title { font-size: 13px; font-weight: 600; color: #64748b; }
+        .log-clear {
+            padding: 4px 10px; background: #374151; border: none; border-radius: 4px;
+            color: #9ca3af; font-size: 12px; cursor: pointer;
+        }
+        .log-clear:hover { background: #4b5563; }
+        .log-content { flex: 1; overflow: auto; padding: 10px 15px; font-family: 'Consolas', monospace; font-size: 12px; }
+        .log-entry { margin-bottom: 4px; }
+        .log-time { color: #60a5fa; }
+        .log-text { color: #10b981; }
+        .log-error { color: #ef4444; }
+        .log-warning { color: #f59e0b; }
+
+        #fileInput { display: none; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        .placeholder {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; color: #64748b; text-align: center;
+        }
+        .placeholder-icon { font-size: 48px; margin-bottom: 15px; }
+        .placeholder-text { font-size: 14px; }
+
+        .header-detection-bar {
+            padding: 10px 15px;
+            background: rgba(30, 41, 59, 0.6);
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+        .header-toggle-btn {
+            padding: 5px 12px;
+            background: #374151;
+            border: 1px solid #4b5563;
+            border-radius: 4px;
+            color: #9ca3af;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .header-toggle-btn:hover {
+            background: #4b5563;
+            border-color: #60a5fa;
+            color: #60a5fa;
+        }
+        .header-toggle-btn.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="sidebar-title">📊 数据分析工具</div>
+                <button class="btn btn-primary" onclick="importFile()">📁 1. 导入数据</button>
+                <button class="btn btn-success" onclick="preprocessData()">🔧 2. 数据预处理</button>
+                <button class="btn btn-warning" onclick="analyzeData()">📈 3. 数据分析</button>
+                <button class="btn btn-info" onclick="generateCharts()">📊 4. 生成图表</button>
+                <button class="btn btn-danger" onclick="exportReport()">📄 5. 导出报告</button>
+                <div class="divider"></div>
+                <button class="btn btn-oneclick" onclick="oneClickAnalyze()">⚡ 一键分析</button>
+            </div>
+
+            <div class="data-panel">
+                <div class="panel-header">
+                    <span class="panel-title">📋 数据预览</span>
+                    <span class="data-info" id="dataInfo">等待导入数据...</span>
+                </div>
+                <div class="header-detection-bar" id="headerDetectionBar" style="display: none;">
+                    <span id="headerDetectionText" style="color: #94a3b8;">智能检测: </span>
+                    <button class="header-toggle-btn" id="headerToggleBtn" onclick="toggleHeaderDetection()">切换列标题模式</button>
+                </div>
+                <div class="table-container" id="tableContainer">
+                    <div class="placeholder">
+                        <div class="placeholder-icon">📁</div>
+                        <div class="placeholder-text">请导入数据文件</div>
+                        <div class="placeholder-text" style="font-size: 12px; margin-top: 10px; color: #94a3b8;">
+                            🎯 智能支持: Excel(.xlsx/.xls/.xlsb/.xlsm), CSV, TXT, 任意分隔符
+                        </div>
+                        <div class="placeholder-text" style="font-size: 12px; margin-top: 5px; color: #64748b;">
+                            ✨ 自动识别列标题，无标题时自动生成 (A, B, C...)
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="analysis-panel">
+                <div class="panel-header">
+                    <span class="panel-title">📈 可视化图表</span>
+                    <button class="download-chart-btn" id="downloadChartBtn" onclick="downloadChart()" style="display: none;">📥 下载图表</button>
+                </div>
+                <div class="chart-tabs" id="chartTabs"></div>
+                <div class="chart-container" id="chartContainer">
+                    <div class="placeholder" id="chartPlaceholder">
+                        <div class="placeholder-icon">📊</div>
+                        <div class="placeholder-text">生成图表后将在此显示</div>
+                    </div>
+                    <div id="chart" style="display: none;"></div>
+                </div>
+                <div class="result-container">
+                    <div class="result-title">📝 分析结果</div>
+                    <div class="result-content" id="resultContent">等待分析...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log-panel">
+            <div class="log-header">
+                <span class="log-title">📜 运行日志</span>
+                <button class="log-clear" onclick="clearLog()">清空</button>
+            </div>
+            <div class="log-content" id="logContent"></div>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsb,.xlsm,.csv,.txt,.dat,.tsv" onchange="handleFileSelect(event)">
+
+    <script>
+        let rawData = null, processedData = null, dataHeaders = [];
+        let charts = {}, currentChartType = null, chartInstance = null;
+        let hasHeader = true;
+        let originalRawData = null;
+
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log-entry';
+            let className = 'log-text';
+            if (type === 'error') className = 'log-error';
+            else if (type === 'warning') className = 'log-warning';
+            logDiv.innerHTML = `<span class="log-time">[${time}]</span> <span class="${className}">${message}</span>`;
+            document.getElementById('logContent').appendChild(logDiv);
+            document.getElementById('logContent').scrollTop = document.getElementById('logContent').scrollHeight;
+        }
+
+        function clearLog() { document.getElementById('logContent').innerHTML = ''; }
+
+        function importFile() { document.getElementById('fileInput').click(); }
+
+        function isNumericValue(cell) {
+            if (cell === null || cell === undefined || cell === '' || cell === ' ') return false;
+            const num = parseFloat(cell);
+            return !isNaN(num) && !isNaN(cell);
+        }
+
+        function analyzeRowType(row) {
+            let textCount = 0, numCount = 0, dateCount = 0, emptyCount = 0;
+            let totalCells = row.filter(cell => cell !== null && cell !== undefined).length;
+            
+            if (totalCells === 0) return { type: 'empty', ratio: 0 };
+            
+            row.forEach(cell => {
+                if (cell === null || cell === undefined || cell === '' || cell === ' ') {
+                    emptyCount++;
+                } else if (isNumericValue(cell)) {
+                    numCount++;
+                } else {
+                    const dateRegex = /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/;
+                    const timeRegex = /^\d{1,2}:\d{2}(:\d{2})?/;
+                    if (dateRegex.test(String(cell)) || timeRegex.test(String(cell))) {
+                        dateCount++;
+                    } else {
+                        textCount++;
+                    }
+                }
+            });
+            
+            const filledRatio = (row.length - emptyCount) / row.length;
+            
+            const textRatio = totalCells > 0 ? textCount / totalCells : 0;
+            const numRatio = totalCells > 0 ? numCount / totalCells : 0;
+            
+            if (filledRatio < 0.2) return { type: 'sparse', ratio: filledRatio };
+            if (textRatio > 0.7) return { type: 'text', ratio: textRatio };
+            if (numRatio > 0.8) return { type: 'numeric', ratio: numRatio };
+            if (dateCount > textCount && dateCount > numCount) return { type: 'date', ratio: dateCount / totalCells };
+            
+            return { type: 'mixed', ratio: filledRatio };
+        }
+
+        function autoDetectHeader(data) {
+            if (data.length < 2) {
+                log(`⚠️ 数据行数较少(${data.length}行)，默认不识别标题行`, 'warning');
+                return false;
+            }
+            
+            const firstRow = data[0];
+            const secondRow = data[1];
+            
+            const firstRowType = analyzeRowType(firstRow);
+            const secondRowType = analyzeRowType(secondRow);
+            
+            log(`   第一行分析: ${firstRowType.type} (比率: ${(firstRowType.ratio * 100).toFixed(0)}%)`);
+            log(`   第二行分析: ${secondRowType.type} (比率: ${(secondRowType.ratio * 100).toFixed(0)}%)`);
+            
+            if (firstRowType.type === 'empty') {
+                log(`⚠️ 第一行为空，自动跳过`, 'warning');
+                return 'skip_first';
+            }
+            
+            if (firstRowType.type === 'text' && secondRowType.type === 'numeric') {
+                log(`✅ 检测到: 第一行是标题，第二行是数据`);
+                return true;
+            }
+            
+            if (firstRowType.type === 'text' && secondRowType.type !== 'text') {
+                log(`✅ 检测到: 第一行文本比例高，判定为标题`);
+                return true;
+            }
+            
+            if (firstRowType.type === 'numeric' && secondRowType.type === 'numeric') {
+                const firstRowAvgLen = firstRow.filter(c => c !== null && c !== undefined).reduce((sum, c) => sum + String(c).length, 0) / firstRow.length;
+                const secondRowAvgLen = secondRow.filter(c => c !== null && c !== undefined).reduce((sum, c) => sum + String(c).length, 0) / secondRow.length;
+                
+                if (firstRowAvgLen < secondRowAvgLen * 0.5) {
+                    log(`✅ 检测到: 第一行文本较短，可能是编号或标题`);
+                    return true;
+                }
+                
+                const firstRowHasDuplicates = firstRow.length !== new Set(firstRow.filter(c => c !== null && c !== undefined)).size;
+                if (!firstRowHasDuplicates) {
+                    log(`✅ 检测到: 第一行无重复值，可能是唯一标识列`);
+                    return true;
+                }
+            }
+            
+            const allRows = data.slice(0, Math.min(10, data.length));
+            const firstRowUniqueness = firstRow.length > 0 ? new Set(firstRow.filter(c => c !== null && c !== undefined)).size / firstRow.length : 0;
+            const avgUniqueness = allRows.slice(1).reduce((sum, row) => {
+                const unique = new Set(row.filter(c => c !== null && c !== undefined)).size;
+                return sum + (unique / row.length);
+            }, 0) / (allRows.length - 1);
+            
+            if (firstRowUniqueness === 1 && avgUniqueness < 0.8) {
+                log(`✅ 检测到: 第一行完全唯一，判定为标题`);
+                return true;
+            }
+            
+            log(`⚠️ 智能检测结果: 无法明确识别标题行`, 'warning');
+            return false;
+        }
+
+        function generateColumnNames(count, prefix = '') {
+            const names = [];
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            for (let i = 0; i < count; i++) {
+                let name = '';
+                let num = i;
+                do {
+                    name = letters[num % 26] + name;
+                    num = Math.floor(num / 26) - 1;
+                } while (num >= 0);
+                names.push(prefix + name);
+            }
+            return names;
+        }
+
+        function detectDelimiter(text) {
+            const delimiters = [
+                { name: 'Tab', regex: /\t/g, weight: 10 },
+                { name: 'Comma', regex: /,/g, weight: 8 },
+                { name: 'Semicolon', regex: /;/g, weight: 6 },
+                { name: 'Pipe', regex: /\|/g, weight: 5 },
+                { name: 'Space', regex: / {2,}/g, weight: 3 },
+                { name: 'Single Space', regex: / /g, weight: 2 },
+            ];
+            
+            let bestDelimiter = { name: 'Comma', char: ',', score: 0 };
+            
+            delimiters.forEach(delim => {
+                const matches = text.match(delim.regex);
+                const count = matches ? matches.length : 0;
+                const score = count * delim.weight;
+                
+                if (score > bestDelimiter.score) {
+                    bestDelimiter = {
+                        name: delim.name,
+                        char: delim.name === 'Tab' ? '\t' : 
+                              delim.name === 'Comma' ? ',' :
+                              delim.name === 'Semicolon' ? ';' :
+                              delim.name === 'Pipe' ? '|' : ' ',
+                        score: score
+                    };
+                }
+            });
+            
+            return bestDelimiter;
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const maxFileSize = 100 * 1024 * 1024;
+            if (file.size > maxFileSize) {
+                log(`❌ 文件过大 (${(file.size / 1024 / 1024).toFixed(2)} MB)，最大支持 100 MB`, 'error');
+                alert(`文件过大！\n\n当前文件: ${(file.size / 1024 / 1024).toFixed(2)} MB\n最大支持: 100 MB\n\n请尝试：\n1. 拆分文件\n2. 删除不必要的列\n3. 使用CSV格式（更节省空间）`);
+                return;
+            }
+            
+            log(`📂 正在导入文件: ${file.name}`);
+            log(`   文件大小: ${(file.size / 1024).toFixed(2)} KB`);
+            
+            const fileName = file.name.toLowerCase();
+            const fileExt = fileName.split('.').pop().toLowerCase();
+            
+            const supportedExts = ['xlsx', 'xls', 'xlsb', 'xlsm', 'csv', 'txt', 'dat', 'tsv'];
+            if (!supportedExts.includes(fileExt)) {
+                log(`⚠️ 未知文件格式: .${fileExt}，尝试以文本格式读取...`, 'warning');
+            }
+            
+            const encodings = ['UTF-8', 'GBK', 'GB2312', 'GB18030', 'Big5'];
+            let currentEncodingIndex = 0;
+            
+            const processData = (data, isArrayBuffer = false) => {
+                try {
+                    log('⏳ 正在解析文件内容...');
+                    
+                    let workbook, sheetName;
+                    
+                    if (['xlsx', 'xls', 'xlsb', 'xlsm'].includes(fileExt)) {
+                        log(`   XLSX.read 类型: ${typeof XLSX.read}`);
+                        log(`   isArrayBuffer: ${isArrayBuffer}`);
+                        log(`   data 类型: ${typeof data}`);
+                        
+                        const arrayData = isArrayBuffer ? data : new Uint8Array(data);
+                        log(`   文件类型: ${fileExt.toUpperCase()}`);
+                        log(`   文件大小: ${arrayData ? arrayData.length : 'null'} 字节`);
+                        
+                        const xlsxOptions = [
+                            { cellDates: true, raw: false, cellHTML: false, codepage: 936 },
+                            { cellDates: true, raw: true, cellHTML: false, codepage: 936 },
+                            { cellDates: false, raw: false, cellHTML: false, codepage: 936 },
+                            { cellDates: true, raw: false, cellHTML: true, codepage: 936 },
+                            { cellDates: true, raw: false, cellHTML: false, codepage: 65001 }
+                        ];
+                        
+                        let tempWorkbook = null;
+                        let lastError = null;
+                        
+                        for (let i = 0; i < xlsxOptions.length && !tempWorkbook; i++) {
+                            try {
+                                log(`   尝试解析选项 ${i + 1}...`);
+                                if (typeof XLSX.read !== 'function') {
+                                    log(`   ❌ XLSX.read 不是函数!`, 'warning');
+                                    continue;
+                                }
+                                tempWorkbook = XLSX.read(arrayData, { 
+                                    type: 'array',
+                                    ...xlsxOptions[i]
+                                });
+                                log(`   ✅ 解析成功, workbook类型: ${typeof tempWorkbook}`);
+                                if (tempWorkbook) {
+                                    log(`   ✅ SheetNames: ${tempWorkbook.SheetNames ? tempWorkbook.SheetNames.length : 'undefined'}`);
+                                }
+                            } catch (xlsxError) {
+                                lastError = xlsxError;
+                                log(`   ❌ 解析失败: ${xlsxError.message.slice(0, 80)}...`, 'warning');
+                            }
+                        }
+                        
+                        if (!tempWorkbook) {
+                            throw lastError || new Error('无法解析Excel文件');
+                        }
+                        
+                        workbook = tempWorkbook;
+                        log(`   ✅ workbook 已赋值`);
+                    } else {
+                        const text = data;
+                        const detected = detectDelimiter(text);
+                        log(`   自动检测分隔符: ${detected.name} (${detected.char === '\t' ? '\\t' : detected.char})`);
+                        
+                        const lines = text.split(/\r?\n/).filter(line => line.trim());
+                        
+                        const rows = lines.map(line => {
+                            if (detected.name === 'Space' || detected.name === 'Single Space') {
+                                return line.split(detected.char).map(cell => cell.trim());
+                            }
+                            return line.split(detected.char);
+                        });
+                        
+                        const maxCols = Math.max(...rows.map(r => r.length));
+                        const normalizedRows = rows.map(row => {
+                            while (row.length < maxCols) row.push('');
+                            return row;
+                        });
+                        
+                        workbook = {
+                            SheetNames: ['Sheet1'],
+                            Sheets: {
+                                'Sheet1': XLSX.utils.aoa_to_sheet(normalizedRows)
+                            }
+                        };
+                    }
+                    
+                    sheetName = workbook.SheetNames[0];
+                    log(`   工作表: ${sheetName}`);
+                    if (workbook.SheetNames.length > 1) {
+                        log(`   ⚠️ 警告: 文件包含 ${workbook.SheetNames.length} 个工作表，仅读取第一个`, 'warning');
+                    }
+                    
+                    log('   正在读取数据...');
+                    const worksheet = workbook.Sheets[sheetName];
+                    
+                    try {
+                        rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+                    } catch (jsonError) {
+                        log(`   ⚠️ JSON解析失败，尝试原始模式...`, 'warning');
+                        rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true });
+                    }
+                    
+                    log(`   原始行数: ${rawData.length}`);
+                    
+                    originalRawData = JSON.parse(JSON.stringify(rawData));
+                    
+                    rawData = rawData.filter(row => {
+                        if (!row || row.length === 0) return false;
+                        return row.some(cell => cell !== null && cell !== undefined && cell !== '' && cell !== ' ');
+                    });
+                    
+                    log(`   过滤后行数: ${rawData.length}`);
+                    
+                    if (rawData.length === 0) {
+                        throw new Error('No valid data found');
+                    }
+                    
+                    const hasInvalidChars = rawData.some(row => 
+                        row.some(cell => cell && String(cell).includes('\uFFFD'))
+                    );
+                    
+                    if (hasInvalidChars && currentEncodingIndex < encodings.length - 1) {
+                        throw new Error('Encoding error, trying next encoding');
+                    }
+                    
+                    const detectionResult = autoDetectHeader(rawData);
+                    
+                    if (detectionResult === 'skip_first') {
+                        rawData = rawData.slice(1);
+                        hasHeader = false;
+                    } else {
+                        hasHeader = detectionResult;
+                    }
+                    
+                    if (hasHeader) {
+                        dataHeaders = rawData[0].map((cell, i) => {
+                            if (cell === null || cell === undefined || cell === '' || cell === ' ') {
+                                return generateColumnNames(rawData[0].length)[i];
+                            }
+                            const header = String(cell).trim();
+                            if (header.length === 0) {
+                                return generateColumnNames(rawData[0].length)[i];
+                            }
+                            return header;
+                        });
+                        rawData = rawData.slice(1);
+                        log(`✅ 智能识别: 第一行为列标题`);
+                    } else {
+                        const colCount = rawData[0] ? rawData[0].length : 0;
+                        dataHeaders = generateColumnNames(colCount);
+                        log(`⚠️ 智能识别: 未检测到列标题，自动生成列名 (A, B, C...)`, 'warning');
+                    }
+                    
+                    rawData = rawData.filter(row => row.some(cell => cell !== null && cell !== undefined && cell !== '' && cell !== ' '));
+                    
+                    if (rawData.length === 0) {
+                        throw new Error('All data rows are empty');
+                    }
+                    
+                    log(`✅ 数据导入成功！`);
+                    log(`   • 行数: ${rawData.length}`);
+                    log(`   • 列数: ${dataHeaders.length}`);
+                    log(`   • 编码: ${encodings[currentEncodingIndex]}`);
+                    log(`   • 列名: ${dataHeaders.slice(0, 10).join(', ')}${dataHeaders.length > 10 ? '...' : ''}`);
+                    
+                    renderTable([dataHeaders, ...rawData], dataHeaders);
+                    document.getElementById('dataInfo').textContent = `${rawData.length} 行 × ${dataHeaders.length} 列${hasHeader ? '' : ' (自动列名)'}`;
+                    
+                    document.getElementById('headerDetectionBar').style.display = 'flex';
+                    document.getElementById('headerDetectionText').textContent = `智能检测: ${hasHeader ? '已识别标题行' : '自动生成列名'} - 点击按钮可手动切换`;
+                    
+                    log('💡 提示: 可以继续进行数据预处理或直接点击"一键分析"');
+                    
+                    return true;
+                } catch (error) {
+                    if (error.message.includes('Encoding error') && currentEncodingIndex < encodings.length - 1) {
+                        currentEncodingIndex++;
+                        log(`   尝试编码: ${encodings[currentEncodingIndex]}`);
+                        return false;
+                    }
+                    throw error;
+                }
+            };
+            
+            const handleTextFile = (encodingIndex) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        currentEncodingIndex = encodingIndex;
+                        const text = e.target.result;
+                        
+                        const hasInvalidChars = text.includes('\uFFFD');
+                        
+                        if (hasInvalidChars && encodingIndex < encodings.length - 1) {
+                            log(`   编码 ${encodings[encodingIndex]} 解码失败，尝试 ${encodings[encodingIndex + 1]}`);
+                            handleTextFile(encodingIndex + 1);
+                            return;
+                        }
+                        
+                        const success = processData(text, false);
+                        if (!success) {
+                            handleTextFile(encodingIndex + 1);
+                        }
+                    } catch (error) {
+                        if (encodingIndex < encodings.length - 1) {
+                            log(`   编码 ${encodings[encodingIndex]} 解析失败，尝试 ${encodings[encodingIndex + 1]}`, 'warning');
+                            handleTextFile(encodingIndex + 1);
+                        } else {
+                            handleError(error);
+                        }
+                    }
+                };
+                reader.onerror = function() {
+                    if (encodingIndex < encodings.length - 1) {
+                        handleTextFile(encodingIndex + 1);
+                    } else {
+                        handleError(new Error('文件读取失败'));
+                    }
+                };
+                reader.readAsText(file, encodings[encodingIndex]);
+            };
+            
+            const handleBinaryFile = () => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        log(`   读取文件成功，开始处理...`);
+                        const success = processData(e.target.result, true);
+                        if (!success) {
+                            log(`   ⚠️ processData 返回 false，尝试下一个编码`, 'warning');
+                            if (currentEncodingIndex < encodings.length - 1) {
+                                currentEncodingIndex++;
+                                log(`   尝试编码: ${encodings[currentEncodingIndex]}`);
+                                handleBinaryFile();
+                                return;
+                            }
+                            throw new Error('无法解析文件内容');
+                        }
+                    } catch (error) {
+                        handleError(error);
+                    }
+                };
+                reader.onerror = function(e) {
+                    handleError(new Error('文件读取失败: ' + e.target.error));
+                };
+                reader.readAsArrayBuffer(file);
+            };
+            
+            const handleError = (error) => {
+                log(`❌ 导入失败: ${error.message}`, 'error');
+                console.error('详细错误:', error);
+                
+                let errorTip = '文件导入失败！\n\n';
+                if (error.message.includes('Invalid') || error.message.includes('corrupt')) {
+                    errorTip += '• 文件可能已损坏或格式不兼容\n';
+                } else if (error.message.includes('_password') || error.message.includes('encrypted')) {
+                    errorTip += '• 文件已加密/受密码保护\n';
+                    errorTip += '• 请先解除密码保护\n';
+                } else if (error.message.includes('unsupported')) {
+                    errorTip += '• 文件格式不受支持\n';
+                    errorTip += '• 请尝试另存为 .xlsx 格式\n';
+                } else if (error.message.includes('out of memory')) {
+                    errorTip += '• 文件过大，内存不足\n';
+                    errorTip += '• 请尝试拆分文件或使用较小的数据集\n';
+                } else if (error.message.includes('No valid data')) {
+                    errorTip += '• 文件中没有找到有效数据\n';
+                    errorTip += '• 请确保文件包含数据内容\n';
+                } else {
+                    errorTip += '• 无法识别的文件格式\n';
+                    errorTip += '• 可能是编码问题或文件损坏\n';
+                }
+                errorTip += '\n请尝试：\n1. 用 Excel/WPS 打开文件\n2. 另存为 .xlsx 格式\n3. 确保文件未被加密';
+                
+                alert(errorTip);
+            };
+            
+            log(`   检测到扩展名: .${fileExt}`);
+            
+            if (['csv', 'txt', 'dat', 'tsv'].includes(fileExt)) {
+                log(`   开始尝试多种编码解析...`);
+                handleTextFile(0);
+            } else {
+                handleBinaryFile();
+            }
+            
+            event.target.value = '';
+        }
+
+        function toggleHeaderDetection() {
+            if (!originalRawData) return;
+            
+            rawData = JSON.parse(JSON.stringify(originalRawData));
+            rawData = rawData.filter(row => {
+                if (!row || row.length === 0) return false;
+                return row.some(cell => cell !== null && cell !== undefined && cell !== '' && cell !== ' ');
+            });
+            
+            hasHeader = !hasHeader;
+            
+            if (hasHeader) {
+                if (rawData.length > 0) {
+                    dataHeaders = rawData[0].map((cell, i) => {
+                        if (cell === null || cell === undefined || cell === '' || cell === ' ') {
+                            return generateColumnNames(rawData[0].length)[i];
+                        }
+                        return String(cell).trim();
+                    });
+                    rawData = rawData.slice(1);
+                }
+                log(`🔄 切换为: 使用第一行作为列标题`);
+            } else {
+                const colCount = rawData[0] ? rawData[0].length : 0;
+                dataHeaders = generateColumnNames(colCount);
+                log(`🔄 切换为: 自动生成列名 (A, B, C...)`);
+            }
+            
+            rawData = rawData.filter(row => row.some(cell => cell !== null && cell !== undefined && cell !== '' && cell !== ' '));
+            
+            renderTable([dataHeaders, ...rawData], dataHeaders);
+            document.getElementById('dataInfo').textContent = `${rawData.length} 行 × ${dataHeaders.length} 列${hasHeader ? '' : ' (自动列名)'}`;
+            document.getElementById('headerDetectionText').textContent = `智能检测: ${hasHeader ? '已识别标题行' : '自动生成列名'} - 点击按钮可手动切换`;
+        }
+
+        function renderTable(data, headers) {
+            const container = document.getElementById('tableContainer');
+            let html = '<table class="data-table"><thead><tr>';
+            headers.forEach((header, i) => {
+                html += `<th>${header}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            const displayData = data.slice(1, 101);
+            displayData.forEach(row => {
+                html += '<tr>';
+                headers.forEach((_, i) => {
+                    let cell = row[i];
+                    if (cell === null || cell === undefined) cell = '';
+                    const cellStr = String(cell);
+                    html += `<td title="${cellStr.length > 50 ? cellStr : ''}">${cellStr.slice(0, 100)}${cellStr.length > 100 ? '...' : ''}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            const totalRows = data.length - 1;
+            if (totalRows > 100) html += `<tr><td colspan="${headers.length}" style="text-align: center; color: #64748b;">... 显示前 100 行，共 ${totalRows} 行</td></tr>`;
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function preprocessData() {
+            if (!rawData) { alert('请先导入数据！'); return; }
+            log('开始数据预处理...');
+            const preprocessStartTime = Date.now();
+            
+            let data = JSON.parse(JSON.stringify(rawData));
+            let report = [];
+            const originalRowCount = data.length;
+            const originalColCount = dataHeaders.length;
+
+            let missingCount = 0;
+            let filledByMean = {};
+            
+            dataHeaders.forEach((header, colIdx) => {
+                const values = data.map(row => parseFloat(row[colIdx])).filter(v => !isNaN(v));
+                if (values.length > 0) {
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    filledByMean[colIdx] = mean;
+                }
+            });
+
+            data = data.map(row => row.map((cell, idx) => {
+                if (cell === null || cell === undefined || cell === '' || cell === ' ') {
+                    missingCount++;
+                    const values = data.map(r => parseFloat(r[idx])).filter(v => !isNaN(v));
+                    if (values.length > 0) {
+                        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                        return mean.toFixed(2);
+                    }
+                    return '';
+                }
+                return cell;
+            }));
+            if (missingCount > 0) report.push(`• 缺失值处理：使用列均值填充了 ${missingCount} 个缺失值`);
+
+            let beforeLen = data.length;
+            const seen = new Set();
+            data = data.filter(row => {
+                const key = row.map(cell => String(cell)).join('|');
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            let duplicatesRemoved = beforeLen - data.length;
+            if (duplicatesRemoved > 0) report.push(`• 重复值处理：删除了 ${duplicatesRemoved} 条重复记录`);
+
+            let numericCols = [];
+            dataHeaders.forEach((header, idx) => {
+                if (isNumericColumn(data, idx)) numericCols.push(idx);
+            });
+
+            numericCols.forEach(colIdx => {
+                let values = data.map(row => parseFloat(row[colIdx])).filter(v => !isNaN(v));
+                if (values.length >= 4) {
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+                    const std = Math.sqrt(variance);
+                    
+                    const lower = mean - 3 * std;
+                    const upper = mean + 3 * std;
+                    let outliers = 0;
+                        
+                    data.forEach(row => {
+                        let val = parseFloat(row[colIdx]);
+                        if (!isNaN(val) && (val < lower || val > upper)) {
+                            outliers++;
+                            row[colIdx] = val < lower ? lower.toFixed(2) : upper.toFixed(2);
+                        }
+                    });
+                        
+                    if (outliers > 0) report.push(`• 异常值处理（3σ原则）："${dataHeaders[colIdx]}" 列修正了 ${outliers} 个异常值（均值: ${mean.toFixed(2)}, 标准差: ${std.toFixed(2)}）`);
+                }
+            });
+
+            data = data.map(row => row.map(cell => {
+                if (typeof cell === 'string') {
+                    const num = parseFloat(cell);
+                    if (!isNaN(num) && String(num) === cell) {
+                        return num;
+                    }
+                }
+                return cell;
+            }));
+            report.push(`• 数据类型优化：自动转换数值字符串为数字类型`);
+
+            processedData = data;
+            renderTable([dataHeaders, ...processedData], dataHeaders);
+            log('数据预处理完成！');
+            
+            let result = `<strong>━━━━━━ 数据预处理报告 ━━━━━━</strong><br><br>`;
+            result += `<strong>📊 处理概览：</strong><br>`;
+            result += `• 原始数据：${originalRowCount} 行 × ${originalColCount} 列<br>`;
+            result += `• 处理后：${data.length} 行 × ${originalColCount} 列<br>`;
+            result += `• 处理耗时：${Date.now() - preprocessStartTime}ms<br><br>`;
+            result += `<strong>🔧 处理详情：</strong><br>`;
+            result += report.length > 0 ? report.join('<br>') : '• 数据已优化，无需特殊处理';
+            result += `<br><br><strong>💡 提示：</strong><br>`;
+            result += `处理后的数据将用于后续分析和图表生成。<br>`;
+            result += `如需重新处理，请先重新导入数据。`;
+            
+            document.getElementById('resultContent').innerHTML = result;
+        }
+
+        function isNumericColumn(data, colIdx) {
+            let numericCount = 0, totalCount = 0;
+            data.forEach(row => {
+                if (row[colIdx] !== null && row[colIdx] !== undefined && row[colIdx] !== '') {
+                    totalCount++;
+                    if (!isNaN(parseFloat(row[colIdx])) && !isNaN(row[colIdx])) {
+                        numericCount++;
+                    }
+                }
+            });
+            return totalCount > 0 && numericCount / totalCount > 0.7;
+        }
+
+        function percentile(arr, p) { 
+            if (arr.length === 0) return 0;
+            arr = [...arr].sort((a, b) => a - b); 
+            const index = Math.ceil(p / 100 * arr.length) - 1;
+            return arr[Math.max(0, Math.min(index, arr.length - 1))]; 
+        }
+
+        function analyzeData() {
+            let data = processedData || rawData;
+            if (!data) { alert('请先导入数据！'); return; }
+            log('开始数据分析...');
+            
+            let numericCols = [];
+            dataHeaders.forEach((header, idx) => {
+                if (isNumericColumn(data, idx)) numericCols.push({ idx, name: header });
+            });
+
+            let result = '<strong>━━━━━━ 数据分析报告 ━━━━━━</strong><br><br>';
+            
+            result += `<strong>📊 数据集概览：</strong><br>`;
+            result += `• 样本数：${data.length} 条<br>`;
+            result += `• 特征数：${dataHeaders.length} 个<br>`;
+            result += `• 数值型特征：${numericCols.length} 个<br>`;
+            
+            const dateCol = dataHeaders.find(h => h.includes('日期') || h.includes('时间') || h.includes('date'));
+            if (dateCol) result += `• ⏰ 时间列：${dateCol}<br><br>`;
+            else result += `<br>`;
+
+            result += `<strong>🔍 数据质量评估：</strong><br>────────────────────<br>`;
+            let qualityIssues = [];
+            dataHeaders.forEach((header, idx) => {
+                let emptyCount = data.filter(row => !row[idx] || row[idx] === '' || row[idx] === null).length;
+                let emptyRate = (emptyCount / data.length * 100).toFixed(1);
+                if (emptyCount > 0) {
+                    qualityIssues.push(`${header}: ${emptyCount}条缺失 (${emptyRate}%)`);
+                }
+            });
+            if (qualityIssues.length > 0) {
+                result += `<span style="color:#f59e0b">⚠️ 发现数据缺失：</span><br>`;
+                result += qualityIssues.slice(0, 5).map(i => `• ${i}<br>`).join('');
+                if (qualityIssues.length > 5) result += `• 还有 ${qualityIssues.length - 5} 列存在缺失...<br>`;
+            } else {
+                result += `<span style="color:#10b981">✅ 数据完整，无缺失值</span><br>`;
+            }
+            result += `<br>`;
+
+            if (numericCols.length > 0) {
+                result += `<strong>📈 描述性统计分析：</strong><br>────────────────────<br>`;
+                numericCols.forEach(col => {
+                    let values = data.map(row => parseFloat(row[col.idx])).filter(v => !isNaN(v));
+                    if (values.length > 0) {
+                        let mean = values.reduce((a, b) => a + b, 0) / values.length;
+                        let sorted = [...values].sort((a, b) => a - b);
+                        let median = sorted[Math.floor(sorted.length / 2)];
+                        let min = Math.min(...values), max = Math.max(...values);
+                        let variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+                        let std = Math.sqrt(variance);
+                        let range = max - min;
+                        let cv = (std / mean * 100).toFixed(1);
+                        let q1 = percentile(values, 25);
+                        let q3 = percentile(values, 75);
+                        let iqr = q3 - q1;
+
+                        result += `<br><strong>【${col.name}】</strong><br>`;
+                        result += `  均值：${mean.toFixed(2)}<br>`;
+                        result += `  中位数：${median.toFixed(2)}<br>`;
+                        result += `  四分位数：Q1=${q1.toFixed(2)}, Q3=${q3.toFixed(2)}, IQR=${iqr.toFixed(2)}<br>`;
+                        result += `  范围：${min.toFixed(2)} ~ ${max.toFixed(2)} (跨度 ${range.toFixed(2)})<br>`;
+                        result += `  标准差：${std.toFixed(2)} (变异系数 ${cv}%)<br>`;
+                        result += `  方差：${variance.toFixed(2)}<br>`;
+                        result += `  样本数：${values.length}<br>`;
+                    }
+                });
+            }
+
+            const categoricalCols = dataHeaders.map((header, idx) => ({ idx, name: header }))
+                .filter(col => !numericCols.some(n => n.idx === col.idx));
+            
+            if (categoricalCols.length > 0 && categoricalCols.some(c => {
+                const values = data.map(row => String(row[c.idx])).filter(v => v && v !== '');
+                return new Set(values).size > 1 && new Set(values).size <= 20;
+            })) {
+                result += `<br><br><strong>📊 分类列统计：</strong><br>────────────────────<br>`;
+                categoricalCols.forEach(col => {
+                    const values = data.map(row => String(row[col.idx])).filter(v => v && v !== '');
+                    const uniqueValues = [...new Set(values)];
+                    
+                    if (uniqueValues.length > 1 && uniqueValues.length <= 20) {
+                        const counts = {};
+                        values.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+                        const sortedCounts = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                        
+                        result += `<br><strong>【${col.name}】</strong><br>`;
+                        result += `  类别数：${uniqueValues.length}<br>`;
+                        result += `  频次分布：<br>`;
+                        sortedCounts.slice(0, 5).forEach(([val, cnt]) => {
+                            const percentage = ((cnt / values.length) * 100).toFixed(1);
+                            result += `    • ${val}: ${cnt}次 (${percentage}%)<br>`;
+                        });
+                        if (sortedCounts.length > 5) {
+                            result += `    • 其他 ${sortedCounts.length - 5} 个类别...<br>`;
+                        }
+                    }
+                });
+            }
+
+            if (numericCols.length >= 2) {
+                result += `<br><br><strong>🔗 相关性分析：</strong><br>────────────────────<br>`;
+                let allCorrelations = [];
+                for (let i = 0; i < Math.min(numericCols.length, 6); i++) {
+                    for (let j = i + 1; j < Math.min(numericCols.length, 6); j++) {
+                        let corr = calculateCorrelation(data, numericCols[i].idx, numericCols[j].idx);
+                        allCorrelations.push({ a: numericCols[i].name, b: numericCols[j].name, corr: corr });
+                    }
+                }
+                
+                allCorrelations.sort((a, b) => Math.abs(b.corr) - Math.abs(a.corr));
+                
+                allCorrelations.forEach(c => {
+                    let strength = '';
+                    let color = '';
+                    if (Math.abs(c.corr) >= 0.8) { strength = '极强'; color = '#ef4444'; }
+                    else if (Math.abs(c.corr) >= 0.6) { strength = '较强'; color = '#f59e0b'; }
+                    else if (Math.abs(c.corr) >= 0.4) { strength = '中等'; color = '#3b82f6'; }
+                    else if (Math.abs(c.corr) >= 0.2) { strength = '较弱'; color = '#64748b'; }
+                    else { strength = '极弱'; color = '#94a3b8'; }
+                    
+                    result += `<span style="color:${color}">• ${c.a} ↔ ${c.b}：${c.corr > 0 ? '正相关' : '负相关'} (${strength}) ${c.corr.toFixed(2)}</span><br>`;
+                });
+            }
+
+            result += `<br><br><strong>🎯 智能洞察：</strong><br>────────────────────<br>`;
+            result += generateInsights(data, numericCols);
+
+            document.getElementById('resultContent').innerHTML = result;
+            log('数据分析完成！');
+        }
+
+        function generateInsights(data, numericCols) {
+            let insights = [];
+            
+            if (numericCols.length > 0) {
+                insights.push(`📈 数据规模：共 ${data.length} 条记录，${numericCols.length} 个数值特征`);
+                
+                const totalStats = numericCols.map(col => {
+                    const values = data.map(row => parseFloat(row[col.idx])).filter(v => !isNaN(v));
+                    if (values.length < 10) return null;
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    const std = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length);
+                    return { name: col.name, mean, std, values };
+                }).filter(s => s);
+
+                if (totalStats.length > 0) {
+                    const highestCV = totalStats.reduce((max, s) => {
+                        const cv = Math.abs(s.std / s.mean);
+                        return cv > max.cv ? { ...s, cv } : max;
+                    }, { cv: 0 });
+
+                    if (highestCV.cv > 0.5) {
+                        insights.push(`⚠️ 变异系数分析：${highestCV.name} 变异系数最高(${highestCV.cv.toFixed(2)})，数据波动较大`);
+                    } else {
+                        insights.push(`✅ 数据稳定性：整体数据波动较小，变异系数均在合理范围内`);
+                    }
+                }
+
+                numericCols.forEach(col => {
+                    let values = data.map(row => parseFloat(row[col.idx])).filter(v => !isNaN(v));
+                    if (values.length < 10) return;
+                    
+                    let mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    let std = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length);
+                    
+                    if (col.name.includes('气温') || col.name.includes('温度') || col.name.includes('temp')) {
+                        let lowCount = values.filter(v => v < 0).length;
+                        let highCount = values.filter(v => v > 30).length;
+                        if (lowCount > 0) insights.push(`❄️ ${col.name}：${lowCount} 条低于0°C，最低 ${Math.min(...values).toFixed(1)}°C`);
+                        if (highCount > 0) insights.push(`☀️ ${col.name}：${highCount} 条高于30°C，最高 ${Math.max(...values).toFixed(1)}°C`);
+                        if (lowCount === 0 && highCount === 0) insights.push(`🌡️ ${col.name}：温度范围 ${Math.min(...values).toFixed(1)}°C ~ ${Math.max(...values).toFixed(1)}°C，整体温和`);
+                    }
+                    
+                    if (col.name.includes('降水') || col.name.includes('雨量') || col.name.includes('rain')) {
+                        let rainyDays = values.filter(v => v > 0).length;
+                        let avgRain = values.filter(v => v > 0).reduce((a, b) => a + b, 0) / (rainyDays || 1);
+                        insights.push(`🌧️ ${col.name}：降水天数 ${rainyDays} 天(${((rainyDays/values.length)*100).toFixed(1)}%)，平均降水量 ${avgRain.toFixed(1)}mm`);
+                    }
+                    
+                    if (col.name.includes('风速') || col.name.includes('wind')) {
+                        let strongWind = values.filter(v => v > 10).length;
+                        if (strongWind > 0) insights.push(`💨 ${col.name}：大风天气 ${strongWind} 次(${((strongWind/values.length)*100).toFixed(1)}%)，最大 ${Math.max(...values).toFixed(1)}m/s`);
+                        else insights.push(`🍃 ${col.name}：风速平稳，最大 ${Math.max(...values).toFixed(1)}m/s`);
+                    }
+                });
+            }
+            
+            if (numericCols.length >= 2) {
+                let strongCorr = [];
+                let weakCorr = [];
+                for (let i = 0; i < numericCols.length; i++) {
+                    for (let j = i + 1; j < numericCols.length; j++) {
+                        let corr = calculateCorrelation(data, numericCols[i].idx, numericCols[j].idx);
+                        if (Math.abs(corr) > 0.7) {
+                            strongCorr.push({ a: numericCols[i].name, b: numericCols[j].name, corr });
+                        } else if (Math.abs(corr) < 0.3) {
+                            weakCorr.push({ a: numericCols[i].name, b: numericCols[j].name, corr });
+                        }
+                    }
+                }
+                
+                if (strongCorr.length > 0) {
+                    insights.push(`🔗 强相关：`);
+                    strongCorr.forEach(c => {
+                        let relation = c.corr > 0 ? '正相关 ↗' : '负相关 ↘';
+                        insights.push(`   • ${c.a} 与 ${c.b} ${relation} (${c.corr.toFixed(2)})`);
+                    });
+                }
+                
+                if (strongCorr.length > 1) {
+                    insights.push(`💡 多重共线性：${strongCorr.length} 对变量存在强相关，可能存在信息冗余`);
+                }
+                
+                if (weakCorr.length > 0) {
+                    insights.push(`🔄 弱/无相关：${weakCorr.length} 对变量相关性较弱，表明数据维度独立性较好`);
+                }
+            }
+
+            const dataQuality = dataHeaders.map((header, idx) => {
+                const emptyCount = data.filter(row => !row[idx] || row[idx] === '' || row[idx] === null).length;
+                return { header, emptyCount, rate: emptyCount / data.length };
+            }).filter(d => d.emptyCount > 0);
+
+            if (dataQuality.length > 0) {
+                insights.push(`⚠️ 数据质量问题：${dataQuality.length} 列存在缺失值`);
+                dataQuality.slice(0, 3).forEach(d => {
+                    insights.push(`   • ${d.header}：${d.emptyCount}条缺失 (${(d.rate*100).toFixed(1)}%)`);
+                });
+            } else {
+                insights.push(`✅ 数据完整性：所有列数据完整，无缺失值`);
+            }
+            
+            if (insights.length === 0) {
+                return '暂无明显数据模式可分析。<br>建议检查数据是否包含气象相关字段（如气温、降水、风速等）。';
+            }
+            
+            return insights.slice(0, 10).map(i => `• ${i}<br>`).join('');
+        }
+
+        function calculateCorrelation(data, col1, col2) {
+            let values1 = [], values2 = [];
+            data.forEach(row => {
+                let v1 = parseFloat(row[col1]), v2 = parseFloat(row[col2]);
+                if (!isNaN(v1) && !isNaN(v2)) { values1.push(v1); values2.push(v2); }
+            });
+
+            if (values1.length < 2) return 0;
+            let mean1 = values1.reduce((a, b) => a + b, 0) / values1.length;
+            let mean2 = values2.reduce((a, b) => a + b, 0) / values2.length;
+            
+            let numerator = 0, denom1 = 0, denom2 = 0;
+            for (let i = 0; i < values1.length; i++) {
+                let d1 = values1[i] - mean1, d2 = values2[i] - mean2;
+                numerator += d1 * d2; denom1 += d1 * d1; denom2 += d2 * d2;
+            }
+            
+            return numerator / Math.sqrt(denom1 * denom2);
+        }
+
+        function generateCharts() {
+            let data = processedData || rawData;
+            if (!data) { alert('请先导入数据！'); return; }
+            log('开始生成图表...');
+            
+            let numericCols = [];
+            dataHeaders.forEach((header, idx) => {
+                if (isNumericColumn(data, idx)) numericCols.push({ idx, name: header });
+            });
+
+            const categoricalCols = dataHeaders.map((header, idx) => ({ idx, name: header }))
+                .filter(col => !numericCols.some(n => n.idx === col.idx));
+
+            const dateCol = detectDateColumn(data, dataHeaders);
+            const hasTimeSeries = dateCol !== null;
+
+            charts = {};
+            let chartTypes = [];
+
+            if (hasTimeSeries && numericCols.length >= 1) {
+                numericCols.slice(0, 3).forEach((col, i) => {
+                    charts[`line_${i}`] = createTimeSeriesChart(data, col, dateCol);
+                    chartTypes.push({ key: `line_${i}`, name: `${col.name}趋势` });
+                });
+            } else if (numericCols.length >= 1) {
+                charts.line = createLineChart(data, numericCols[0]);
+                chartTypes.push({ key: 'line', name: '趋势图' });
+            }
+
+            if (numericCols.length >= 1) {
+                charts.hist = createHistogram(data, numericCols[0]);
+                chartTypes.push({ key: 'hist', name: `${numericCols[0].name}分布` });
+            }
+
+            if (numericCols.length >= 2) {
+                charts.bar = createBarChart(data, numericCols.slice(0, 5));
+                chartTypes.push({ key: 'bar', name: '数值对比' });
+            }
+
+            if (numericCols.length >= 2) {
+                charts.heatmap = createHeatmap(data, numericCols.slice(0, 6));
+                chartTypes.push({ key: 'heatmap', name: '相关性热力图' });
+            }
+
+            const validCategorical = categoricalCols.filter(c => {
+                const values = data.map(row => String(row[c.idx])).filter(v => v && v !== '');
+                return new Set(values).size > 1 && new Set(values).size <= 10;
+            });
+
+            if (validCategorical.length >= 1 && numericCols.length >= 1) {
+                charts.groupedBar = createGroupedBarChart(data, validCategorical[0], numericCols.slice(0, 4));
+                chartTypes.push({ key: 'groupedBar', name: '分组对比' });
+            }
+
+            const tabsContainer = document.getElementById('chartTabs');
+            tabsContainer.innerHTML = chartTypes.map(ct => `<button class="chart-tab" onclick="switchChart('${ct.key}')" id="tab-${ct.key}">${ct.name}</button>`).join('');
+
+            if (chartTypes.length > 0) switchChart(chartTypes[0].key);
+            document.getElementById('downloadChartBtn').style.display = 'block';
+            log(`图表生成完成！共 ${Object.keys(charts).length} 个图表`);
+        }
+
+        function detectDateColumn(data, headers) {
+            for (let i = 0; i < headers.length; i++) {
+                const header = headers[i].toLowerCase();
+                if (header.includes('日期') || header.includes('时间') || header.includes('date') || header.includes('time') || header.includes('timestamp')) {
+                    const values = data.map(row => String(row[i])).filter(v => v && v !== '');
+                    if (values.length > 0 && isDateLike(values[0])) {
+                        log(`检测到时序列: ${headers[i]}`);
+                        return { idx: i, name: headers[i] };
+                    }
+                }
+            }
+            return null;
+        }
+
+        function isDateLike(value) {
+            const datePatterns = [
+                /^\d{4}-\d{2}-\d{2}/,
+                /^\d{4}\/\d{2}\/\d{2}/,
+                /^\d{2}-\d{2}-\d{4}/,
+                /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/,
+                /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/
+            ];
+            return datePatterns.some(pattern => pattern.test(value));
+        }
+
+        function createLineChart(data, col) {
+            const values = data.map(row => parseFloat(row[col.idx])).filter(v => !isNaN(v)).slice(0, 50);
+            return {
+                title: { text: `${col.name} - 趋势图`, textStyle: { color: '#94a3b8' } },
+                tooltip: { trigger: 'axis' },
+                grid: { left: '10%', right: '5%', bottom: '10%', top: '15%' },
+                xAxis: { type: 'category', data: values.map((_, i) => i + 1), axisLabel: { color: '#64748b' } },
+                yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#334155' } } },
+                series: [{ data: values, type: 'line', smooth: true, lineStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59, 130, 246, 0.2)' } }]
+            };
+        }
+
+        function createTimeSeriesChart(data, col, dateCol) {
+            const values = [];
+            const dates = [];
+            data.forEach(row => {
+                const val = parseFloat(row[col.idx]);
+                const date = String(row[dateCol.idx]);
+                if (!isNaN(val) && date && date !== '') {
+                    values.push(val);
+                    dates.push(date);
+                }
+            });
+            
+            const sampleSize = Math.min(100, values.length);
+            const step = Math.floor(values.length / sampleSize);
+            const sampledValues = [];
+            const sampledDates = [];
+            for (let i = 0; i < values.length; i += step) {
+                sampledValues.push(values[i]);
+                sampledDates.push(dates[i]);
+                if (sampledValues.length >= sampleSize) break;
+            }
+
+            return {
+                title: { text: `${col.name} - 时间趋势`, textStyle: { color: '#94a3b8' } },
+                tooltip: { trigger: 'axis', formatter: (params) => `${params[0].axisValue}<br/>${col.name}: ${params[0].value}` },
+                grid: { left: '10%', right: '5%', bottom: '20%', top: '15%' },
+                xAxis: { type: 'category', data: sampledDates, axisLabel: { color: '#64748b', rotate: 45, fontSize: 10 } },
+                yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#334155' } } },
+                series: [{ data: sampledValues, type: 'line', smooth: true, lineStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59, 130, 246, 0.2)' } }]
+            };
+        }
+
+        function createGroupedBarChart(data, categoryCol, numericCols) {
+            const categories = [...new Set(data.map(row => String(row[categoryCol.idx])).filter(v => v && v !== ''))];
+            if (categories.length > 10) categories.splice(10);
+
+            const series = numericCols.map((col, idx) => {
+                const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+                const values = categories.map(cat => {
+                    const catValues = data
+                        .filter(row => String(row[categoryCol.idx]) === cat)
+                        .map(row => parseFloat(row[col.idx]))
+                        .filter(v => !isNaN(v));
+                    return catValues.length > 0 ? catValues.reduce((a, b) => a + b, 0) / catValues.length : 0;
+                });
+                return {
+                    name: col.name,
+                    type: 'bar',
+                    data: values,
+                    itemStyle: { color: colors[idx % colors.length] },
+                    barGap: '10%',
+                    barCategoryGap: '30%'
+                };
+            });
+
+            return {
+                title: { text: `${categoryCol.name} - 分组对比`, textStyle: { color: '#94a3b8' } },
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: { data: numericCols.map(c => c.name), textStyle: { color: '#94a3b8' } },
+                grid: { left: '10%', right: '5%', bottom: '20%', top: '15%' },
+                xAxis: { type: 'category', data: categories, axisLabel: { color: '#64748b', rotate: 30 } },
+                yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#334155' } } },
+                series: series
+            };
+        }
+
+        function createBarChart(data, cols) {
+            const means = cols.map(col => {
+                const values = data.map(row => parseFloat(row[col.idx])).filter(v => !isNaN(v));
+                return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+            });
+            return {
+                title: { text: '各列均值对比', textStyle: { color: '#94a3b8' } },
+                tooltip: { trigger: 'axis' },
+                grid: { left: '10%', right: '5%', bottom: '20%', top: '15%' },
+                xAxis: { type: 'category', data: cols.map(c => c.name), axisLabel: { color: '#64748b', rotate: 30 } },
+                yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#334155' } } },
+                series: [{ data: means, type: 'bar', itemStyle: { color: '#10b981' } }]
+            };
+        }
+
+        function createHistogram(data, col) {
+            const values = data.map(row => parseFloat(row[col.idx])).filter(v => !isNaN(v));
+            if (values.length === 0) {
+                return {
+                    title: { text: `${col.name} - 分布直方图`, textStyle: { color: '#94a3b8' } },
+                    tooltip: { trigger: 'axis' },
+                    grid: { left: '10%', right: '5%', bottom: '10%', top: '15%' },
+                    xAxis: { type: 'category', data: ['无数据'], axisLabel: { color: '#64748b' } },
+                    yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#334155' } } },
+                    series: [{ data: [0], type: 'bar', itemStyle: { color: '#8b5cf6' } }]
+                };
+            }
+            const min = Math.min(...values), max = Math.max(...values);
+            const bins = Math.min(15, values.length);
+            const binWidth = (max - min) / bins;
+            const histogram = new Array(bins).fill(0);
+            
+            values.forEach(v => { 
+                let idx = Math.floor((v - min) / binWidth); 
+                if (idx >= bins) idx = bins - 1; 
+                if (idx >= 0) histogram[idx]++; 
+            });
+
+            return {
+                title: { text: `${col.name} - 分布直方图`, textStyle: { color: '#94a3b8' } },
+                tooltip: { trigger: 'axis' },
+                grid: { left: '10%', right: '5%', bottom: '10%', top: '15%' },
+                xAxis: { type: 'category', data: histogram.map((_, i) => (min + i * binWidth).toFixed(1)), axisLabel: { color: '#64748b', rotate: 45, fontSize: 10 } },
+                yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#334155' } } },
+                series: [{ data: histogram, type: 'bar', itemStyle: { color: '#8b5cf6' } }]
+            };
+        }
+
+        function createHeatmap(data, cols) {
+            const corrMatrix = [];
+            for (let i = 0; i < cols.length; i++) {
+                corrMatrix[i] = [];
+                for (let j = 0; j < cols.length; j++) {
+                    corrMatrix[i][j] = parseFloat(calculateCorrelation(data, cols[i].idx, cols[j].idx).toFixed(2));
+                }
+            }
+
+            return {
+                title: { text: '相关性热力图', textStyle: { color: '#94a3b8' } },
+                tooltip: { position: 'top' },
+                grid: { left: '15%', right: '10%', bottom: '15%', top: '20%' },
+                xAxis: { type: 'category', data: cols.map(c => c.name), axisLabel: { color: '#64748b' } },
+                yAxis: { type: 'category', data: cols.map(c => c.name), axisLabel: { color: '#64748b' } },
+                visualMap: { min: -1, max: 1, calculable: true, inRange: { color: ['#ef4444', '#ffffff', '#3b82f6'] } },
+                series: [{ type: 'heatmap', data: corrMatrix.flatMap((row, i) => row.map((val, j) => [j, i, val])), label: { show: true, color: '#000' } }]
+            };
+        }
+
+        function switchChart(type) {
+            currentChartType = type;
+            document.querySelectorAll('.chart-tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(`tab-${type}`).classList.add('active');
+
+            document.getElementById('chartPlaceholder').style.display = 'none';
+            const chartDom = document.getElementById('chart');
+            chartDom.style.display = 'block';
+
+            if (chartInstance) chartInstance.dispose();
+            chartInstance = echarts.init(chartDom);
+            chartInstance.setOption(charts[type]);
+        }
+
+        function downloadChart() {
+            if (!chartInstance) { alert('请先生成图表！'); return; }
+            
+            const url = chartInstance.getDataURL({
+                type: 'png',
+                pixelRatio: 2,
+                backgroundColor: '#1e293b'
+            });
+            
+            const link = document.createElement('a');
+            link.download = `chart_${currentChartType}_${new Date().getTime()}.png`;
+            link.href = url;
+            link.click();
+            
+            log(`✅ 图表已下载: chart_${currentChartType}.png`);
+        }
+
+        function exportReport() {
+            if (!rawData) { alert('Please analyze data first!'); return; }
+            log('Generating bilingual reports (EN & CN)...');
+            
+            const data = processedData || rawData;
+            let numericCols = [];
+            dataHeaders.forEach((header, idx) => {
+                if (isNumericColumn(data, idx)) numericCols.push({ idx, name: header });
+            });
+            
+            generateHTMLReport('en', data, numericCols);
+            setTimeout(() => {
+                generateHTMLReport('cn', data, numericCols);
+            }, 500);
+        }
+
+        function generateHTMLReport(lang, data, numericCols) {
+            const isCN = lang === 'cn';
+            const title = isCN ? '智能数据分析报告' : 'Intelligent Data Analysis Report';
+            
+            const stats = numericCols.map(col => {
+                const values = data.map(row => parseFloat(row[col.idx])).filter(v => !isNaN(v));
+                if (values.length === 0) return null;
+                const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                const sorted = [...values].sort((a, b) => a - b);
+                const median = sorted[Math.floor(sorted.length / 2)];
+                const std = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const cv = Math.abs(std / mean) * 100;
+                return { col, mean, median, std, min, max, cv };
+            }).filter(s => s);
+            
+            const correlations = [];
+            for (let i = 0; i < numericCols.length; i++) {
+                for (let j = i + 1; j < numericCols.length; j++) {
+                    const corr = calculateCorrelation(data, numericCols[i].idx, numericCols[j].idx);
+                    if (!isNaN(corr)) {
+                        correlations.push({ 
+                            a: numericCols[i].name, 
+                            b: numericCols[j].name, 
+                            corr,
+                            strength: Math.abs(corr) >= 0.7 ? (isCN ? '强相关' : 'Strong') : Math.abs(corr) >= 0.4 ? (isCN ? '中等相关' : 'Medium') : (isCN ? '弱相关' : 'Weak')
+                        });
+                    }
+                }
+            }
+            correlations.sort((a, b) => Math.abs(b.corr) - Math.abs(a.corr));
+            
+            const dataType = detectDataType(dataHeaders);
+            
+            const recommendations = [];
+            const highVol = stats.filter(s => s.cv > 50);
+            const lowVol = stats.filter(s => s.cv < 10);
+            const strongCorr = correlations.filter(c => Math.abs(c.corr) >= 0.7);
+            
+            if (highVol.length > 0) {
+                recommendations.push(isCN ? 
+                    `发现${highVol.length}个指标波动较大，建议调查波动原因并设置预警阈值` :
+                    `Detected ${highVol.length} metrics with high volatility - investigate causes and set warning thresholds`);
+            }
+            if (lowVol.length > 0) {
+                recommendations.push(isCN ?
+                    `${lowVol.length}个指标表现稳定，可能需要关注数据质量问题` :
+                    `${lowVol.length} stable metrics may indicate consistent performance or data quality issues`);
+            }
+            if (strongCorr.length > 0) {
+                recommendations.push(isCN ?
+                    `发现${strongCorr.length}对强相关指标，建议探索因果关系` :
+                    `Found ${strongCorr.length} strongly correlated pairs - explore potential causal relationships`);
+            }
+            if (stats.length > 0) {
+                const highest = stats.reduce((max, s) => s.mean > max.mean ? s : max);
+                const lowest = stats.reduce((min, s) => s.mean < min.mean ? s : min);
+                recommendations.push(isCN ?
+                    `${highest.col.name}均值最高(${highest.mean.toFixed(2)})，${lowest.col.name}均值最低(${lowest.mean.toFixed(2)})` :
+                    `${highest.col.name} has highest average (${highest.mean.toFixed(2)}), ${lowest.col.name} has lowest (${lowest.mean.toFixed(2)})`);
+            }
+            
+            recommendations.push(isCN ? '建议建立关键指标的监控仪表板' : 'Recommend establishing monitoring dashboards for key metrics');
+            recommendations.push(isCN ? '定期进行数据审查和业务分析' : 'Conduct regular data reviews and business analysis');
+            
+            let html = `<!DOCTYPE html>
+<html ${isCN ? 'lang="zh-CN"' : 'lang="en"'}>
+<head>
+    <meta charset="UTF-8">
+    <title>${title}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: ${isCN ? '"Microsoft YaHei", "SimHei", sans-serif' : 'Arial, sans-serif'}; padding: 40px; max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; color: #1e3a5f; margin-bottom: 10px; font-size: 24px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+        h2 { color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; margin: 25px 0 15px 0; font-size: 16px; }
+        .info-box { background: #f5f7fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #ddd; }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { font-weight: bold; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 12px; }
+        th { background: #1e3a5f; color: white; padding: 10px; text-align: left; }
+        td { padding: 8px; border: 1px solid #ddd; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .correlation-item { padding: 8px; background: #fff; border-left: 3px solid #1e3a5f; margin: 8px 0; }
+        .rec-item { padding: 10px; background: #e8f4f8; border-radius: 5px; margin: 8px 0; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 11px; margin-left: 10px; }
+        .badge-high { background: #ff6b6b; color: white; }
+        .badge-medium { background: #ffd93d; color: #333; }
+        .badge-low { background: #6bcb77; color: white; }
+        .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #999; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>${title}</h1>
+    <div class="subtitle">${isCN ? '生成时间' : 'Generated'}: ${new Date().toLocaleString(isCN ? 'zh-CN' : 'en-US')}</div>
+    
+    <h2>${isCN ? '1. 数据概览' : '1. Data Overview'}</h2>
+    <div class="info-box">
+        <div class="info-row">
+            <span class="info-label">${isCN ? '数据类型' : 'Data Type'}:</span>
+            <span>${dataType.cn} / ${dataType.en}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">${isCN ? '记录数' : 'Records'}:</span>
+            <span>${data.length.toLocaleString()}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">${isCN ? '列数' : 'Columns'}:</span>
+            <span>${dataHeaders.length}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">${isCN ? '数值列' : 'Numeric Columns'}:</span>
+            <span>${numericCols.length}</span>
+        </div>
+    </div>
+    
+    <h2>${isCN ? '2. 统计摘要' : '2. Statistical Summary'}</h2>
+    <table>
+        <tr>
+            <th>${isCN ? '指标' : 'Metric'}</th>
+            <th>${isCN ? '均值' : 'Mean'}</th>
+            <th>${isCN ? '中位数' : 'Median'}</th>
+            <th>${isCN ? '标准差' : 'Std'}</th>
+            <th>${isCN ? '最小值' : 'Min'}</th>
+            <th>${isCN ? '最大值' : 'Max'}</th>
+            <th>${isCN ? '波动' : 'Volatility'}</th>
+        </tr>`;
+            
+            stats.forEach(s => {
+                const volBadge = s.cv > 50 ? (isCN ? '波动大' : 'High') : s.cv < 10 ? (isCN ? '稳定' : 'Low') : (isCN ? '中等' : 'Medium');
+                const volClass = s.cv > 50 ? 'badge-high' : s.cv < 10 ? 'badge-low' : 'badge-medium';
+                html += `<tr>
+                    <td>${s.col.name}</td>
+                    <td>${s.mean.toFixed(2)}</td>
+                    <td>${s.median.toFixed(2)}</td>
+                    <td>${s.std.toFixed(2)}</td>
+                    <td>${s.min.toFixed(2)}</td>
+                    <td>${s.max.toFixed(2)}</td>
+                    <td><span class="badge ${volClass}">${volBadge} (${s.cv.toFixed(1)}%)</span></td>
+                </tr>`;
+            });
+            
+            html += `</table>
+    
+    <h2>${isCN ? '3. 相关性分析' : '3. Correlation Analysis'}</h2>`;
+            
+            if (correlations.length > 0) {
+                correlations.slice(0, 5).forEach(c => {
+                    html += `<div class="correlation-item">
+                        <strong>${c.a}</strong> vs <strong>${c.b}</strong>: 
+                        ${c.strength} (${isCN ? '相关系数' : 'Correlation'}: ${c.corr.toFixed(2)})
+                        ${c.corr > 0 ? (isCN ? '同向变化' : 'move together') : (isCN ? '反向变化' : 'move opposite')}
+                    </div>`;
+                });
+            } else {
+                html += `<p>${isCN ? '未发现显著相关性' : 'No significant correlations found'}</p>`;
+            }
+            
+            html += `
+    
+    <h2>${isCN ? '4. 分析结论与建议' : '4. Analysis Conclusions & Recommendations'}</h2>`;
+            
+            recommendations.forEach((rec, i) => {
+                html += `<div class="rec-item">
+                    <strong>${i + 1}.</strong> ${rec}
+                </div>`;
+            });
+            
+            html += `
+    
+    <div class="footer">
+        ${isCN ? '智能数据分析工具自动生成' : 'Generated by Intelligent Data Analysis Tool'} | ${new Date().toLocaleDateString()}
+    </div>
+</body>
+</html>`;
+            
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.target = '_blank';
+            link.click();
+            
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+            log(isCN ? '中文报告已生成' : 'English report generated');
+        }
+
+        function detectDataType(headers) {
+            const headerStr = headers.join(' ').toLowerCase();
+            
+            const patterns = {
+                weather: { cn: '气象数据', en: 'Weather Data', keywords: ['temp', 'temperature', 'rain', 'precipitation', 'wind', 'humidity', '气压', '气温', '降水', '风速'] },
+                sales: { cn: '销售数据', en: 'Sales Data', keywords: ['sale', 'revenue', 'turnover', 'profit', 'cost', '销售额', '营收', '利润', '成本'] },
+                finance: { cn: '财务数据', en: 'Financial Data', keywords: ['price', 'amount', 'transaction', 'budget', 'expense', '价格', '金额', '交易', '预算'] },
+                user: { cn: '用户数据', en: 'User Data', keywords: ['user', 'customer', 'member', 'age', 'gender', '用户', '客户', '会员', '年龄'] },
+                traffic: { cn: '流量数据', en: 'Traffic Data', keywords: ['visit', 'click', 'view', 'traffic', 'conversion', '访问', '点击', '流量', '转化'] },
+                inventory: { cn: '库存数据', en: 'Inventory Data', keywords: ['stock', 'inventory', 'storage', 'quantity', '库存', '数量'] },
+                sensor: { cn: '传感器数据', en: 'Sensor Data', keywords: ['sensor', 'pressure', 'flow', 'speed', '传感器', '压力', '流量'] },
+                medical: { cn: '医疗数据', en: 'Medical Data', keywords: ['patient', 'diagnosis', 'treatment', 'blood', 'patient', 'heart', '患者', '诊断', '血压'] },
+                education: { cn: '教育数据', en: 'Education Data', keywords: ['score', 'grade', 'student', 'test', '成绩', '学生', '考试'] },
+                social: { cn: '社交数据', en: 'Social Data', keywords: ['follow', 'like', 'share', 'comment', '粉丝', '点赞', '评论'] }
+            };
+            
+            for (const [key, value] of Object.entries(patterns)) {
+                if (value.keywords.some(kw => headerStr.includes(kw))) {
+                    return value;
+                }
+            }
+            
+            return { cn: '通用数据', en: 'General Data' };
+        }
+
+        function translateColumnName(name) {
+            if (!name) return 'Column';
+            
+            const translations = {
+                '经度': 'Longitude', '纬度': 'Latitude', '日期': 'Date', '时间': 'Time',
+                '气温': 'Temperature', '温度': 'Temperature', '降水': 'Precipitation', '雨量': 'Rainfall',
+                '风速': 'WindSpeed', '风向': 'WindDirection', '湿度': 'Humidity', '气压': 'Pressure',
+                '地名': 'Location', '城市': 'City', '站点': 'Station', '海拔': 'Altitude',
+                '销售额': 'Sales', '利润': 'Profit', '成本': 'Cost', '收入': 'Revenue',
+                '用户数': 'Users', '订单': 'Orders', '转化率': 'ConversionRate',
+                '评分': 'Rating', '满意度': 'Satisfaction', '访问量': 'Traffic',
+                '数量': 'Quantity', '价格': 'Price', '金额': 'Amount',
+                '年龄': 'Age', '性别': 'Gender', '职业': 'Occupation',
+                'ID': 'ID', '编号': 'ID', '名称': 'Name', '类型': 'Type',
+                '状态': 'Status', '等级': 'Level', '分数': 'Score', '排名': 'Rank'
+            };
+            
+            for (const [cn, en] of Object.entries(translations)) {
+                if (name.includes(cn)) return en;
+            }
+            
+            let sanitized = String(name).replace(/[^\x20-\x7E]/g, '');
+            if (sanitized.length > 0 && sanitized.length <= 12) return sanitized;
+            
+            return 'Column';
+        }
+
+        function generateGenericInsights(data, numericCols, headers) {
+            const insights = [];
+            
+            insights.push('Data Overview / 数据概况:');
+            insights.push('  - ' + data.length.toLocaleString() + ' records / 条记录');
+            insights.push('  - ' + headers.length + ' columns (' + numericCols.length + ' numeric) / 列 (' + numericCols.length + ' 数值列)');
+            
+            if (numericCols.length > 0) {
+                const stats = numericCols.map(col => {
+                    const values = data.map(row => parseFloat(row[col.idx])).filter(v => !isNaN(v));
+                    if (values.length === 0) return null;
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    const std = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length);
+                    const min = Math.min(...values);
+                    const max = Math.max(...values);
+                    const cv = Math.abs(std / mean) * 100;
+                    return { col, mean, std, min, max, cv };
+                }).filter(s => s);
+                
+                if (stats.length > 0) {
+                    insights.push('');
+                    insights.push('Key Metrics / 关键指标:');
+                    
+                    const highest = stats.reduce((max, s) => s.mean > max.mean ? s : max);
+                    const lowest = stats.reduce((min, s) => s.mean < min.mean ? s : min);
+                    const mostVolatile = stats.reduce((max, s) => s.cv > max.cv ? s : max);
+                    
+                    insights.push('  - Highest / 最高: ' + translateColumnName(highest.col.name) + ' (' + highest.mean.toFixed(2) + ')');
+                    insights.push('  - Lowest / 最低: ' + translateColumnName(lowest.col.name) + ' (' + lowest.mean.toFixed(2) + ')');
+                    insights.push('  - Most volatile / 波动最大: ' + translateColumnName(mostVolatile.col.name) + ' (' + mostVolatile.cv.toFixed(1) + '%)');
+                    
+                    const largeRange = stats.filter(s => (s.max - s.min) / s.mean > 2);
+                    if (largeRange.length > 0) {
+                        insights.push('');
+                        insights.push('Wide Range Metrics / 范围较大的指标:');
+                        largeRange.slice(0, 3).forEach(s => {
+                            insights.push('  - ' + translateColumnName(s.col.name) + ': ' + s.min.toFixed(2) + ' ~ ' + s.max.toFixed(2));
+                        });
+                    }
+                }
+                
+                if (numericCols.length >= 2) {
+                    const strongCorr = [];
+                    const mediumCorr = [];
+                    
+                    for (let i = 0; i < numericCols.length; i++) {
+                        for (let j = i + 1; j < numericCols.length; j++) {
+                            const corr = calculateCorrelation(data, numericCols[i].idx, numericCols[j].idx);
+                            if (Math.abs(corr) >= 0.7) {
+                                strongCorr.push({ a: numericCols[i].name, b: numericCols[j].name, corr });
+                            } else if (Math.abs(corr) >= 0.4) {
+                                mediumCorr.push({ a: numericCols[i].name, b: numericCols[j].name, corr });
+                            }
+                        }
+                    }
+                    
+                    if (strongCorr.length > 0 || mediumCorr.length > 0) {
+                        insights.push('');
+                        insights.push('Correlations / 相关性:');
+                        
+                        if (strongCorr.length > 0) {
+                            insights.push('  - Strong / 强相关 (' + strongCorr.length + '):');
+                            strongCorr.slice(0, 3).forEach(c => {
+                                const relation = c.corr > 0 ? 'positive / 正向' : 'negative / 反向';
+                                insights.push('    * ' + translateColumnName(c.a) + ' & ' + translateColumnName(c.b) + ': ' + relation + ' (' + c.corr.toFixed(2) + ')');
+                            });
+                        }
+                        
+                        if (mediumCorr.length > 0) {
+                            insights.push('  - Medium / 中等相关 (' + mediumCorr.length + ' pairs / 对)');
+                        }
+                    }
+                }
+            }
+            
+            return insights;
+        }
+
+        function generateUniversalRecommendations(data, numericCols, headers) {
+            const recommendations = [];
+            
+            const stats = numericCols.map(col => {
+                const values = data.map(row => parseFloat(row[col.idx])).filter(v => !isNaN(v));
+                if (values.length === 0) return null;
+                const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                const std = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const cv = Math.abs(std / mean) * 100;
+                return { col, mean, std, min, max, cv };
+            }).filter(s => s);
+            
+            const highVolatility = stats.filter(s => s.cv > 50);
+            const lowVolatility = stats.filter(s => s.cv < 10);
+            
+            if (highVolatility.length > 0) {
+                recommendations.push('High volatility detected in ' + highVolatility.length + ' metrics - investigate factors causing fluctuations / 检测到' + highVolatility.length + '个指标波动较大，请调查波动原因');
+                recommendations.push('Consider setting early warning thresholds for highly volatile metrics / 为高波动指标设置预警阈值');
+            }
+            
+            if (lowVolatility.length > 0) {
+                recommendations.push('Stable metrics (' + lowVolatility.length + ') may indicate consistent performance or data quality issues / ' + lowVolatility.length + '个指标稳定，可能表示表现一致或存在数据质量问题');
+            }
+            
+            if (stats.length > 0) {
+                const widest = stats.reduce((max, s) => (s.max - s.min) / Math.abs(s.mean || 1) > (max.max - max.min) / Math.abs(max.mean || 1) ? s : max);
+                const ratio = (widest.max - widest.min) / Math.abs(widest.mean || 1);
+                if (ratio > 2) {
+                    recommendations.push(translateColumnName(widest.col.name) + ' has wide range - consider segmentation analysis / 范围较大，建议进行细分分析');
+                }
+            }
+            
+            if (numericCols.length >= 2) {
+                const strongCorr = [];
+                const mediumCorr = [];
+                
+                for (let i = 0; i < numericCols.length; i++) {
+                    for (let j = i + 1; j < numericCols.length; j++) {
+                        const corr = calculateCorrelation(data, numericCols[i].idx, numericCols[j].idx);
+                        if (Math.abs(corr) >= 0.7) {
+                            strongCorr.push({ a: numericCols[i].name, b: numericCols[j].name, corr });
+                        } else if (Math.abs(corr) >= 0.4) {
+                            mediumCorr.push({ a: numericCols[i].name, b: numericCols[j].name, corr });
+                        }
+                    }
+                }
+                
+                if (strongCorr.length > 0) {
+                    recommendations.push('Strong correlations found - explore potential causal relationships / 发现强相关，请探索潜在因果关系');
+                    strongCorr.slice(0, 2).forEach(c => {
+                        const direction = c.corr > 0 ? 'increase together / 同向变化' : 'move opposite / 反向变化';
+                        recommendations.push('  - ' + translateColumnName(c.a) + ' & ' + translateColumnName(c.b) + ': ' + direction);
+                    });
+                }
+                
+                if (mediumCorr.length > 0) {
+                    recommendations.push('Moderate correlations (' + mediumCorr.length + ' pairs) - worth further investigation / ' + mediumCorr.length + '对中等相关，值得进一步研究');
+                }
+            }
+            
+            const skewnessMetrics = stats.filter(s => {
+                const values = data.map(row => parseFloat(row[s.col.idx])).filter(v => !isNaN(v));
+                if (values.length === 0) return false;
+                const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                const median = [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+                return Math.abs(mean - median) / Math.abs(mean || 1) > 0.2;
+            });
+            
+            if (skewnessMetrics.length > 0) {
+                recommendations.push('Data distribution skewed in ' + skewnessMetrics.length + ' metrics - consider non-linear analysis / ' + skewnessMetrics.length + '个指标分布偏斜，建议考虑非线性分析');
+            }
+            
+            recommendations.push('Establish monitoring dashboards for key metrics / 建立关键指标的监控仪表板');
+            recommendations.push('Set up regular data review processes / 建立定期数据审查流程');
+            recommendations.push('Document data definitions and business rules / 记录数据定义和业务规则');
+            
+            return recommendations.slice(0, 8);
+        }
+
+        function oneClickAnalyze() {
+            if (!rawData) { importFile(); return; }
+            setTimeout(() => {
+                preprocessData();
+                setTimeout(() => {
+                    analyzeData();
+                    setTimeout(() => {
+                        generateCharts();
+                        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                        log('✅ 一键分析全部完成！');
+                        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    }, 300);
+                }, 300);
+            }, 100);
+        }
+
+        window.addEventListener('resize', () => { if (chartInstance) chartInstance.resize(); });
+        log('✅ 智能数据分析工具已启动');
+        log('🎯 智能导入模式已开启');
+        log('📋 支持格式：Excel(.xlsx/.xls/.xlsb/.xlsm), CSV, TXT, DAT, TSV');
+        log('✨ 自动检测：分隔符、列标题、数据类型');
+    </script>
+</body>
+</html>
